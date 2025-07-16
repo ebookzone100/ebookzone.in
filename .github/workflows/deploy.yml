@@ -15,10 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,22 +49,31 @@ jobs:
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
 
-      - name: Fix asset paths
+      - name: Configure site
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          # Fix asset paths
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
           find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
+          # Create admin redirects
+          mkdir -p admin
+          cp index.html admin/index.html
+          cp 404.html admin/404.html
+          # Create headers
+          cat > _headers << EOL
+          /*
+            Cache-Control: public, max-age=31536000
+            X-Frame-Options: DENY
+            X-Content-Type-Options: nosniff
+            X-XSS-Protection: 1; mode=block
+            Referrer-Policy: strict-origin-when-cross-origin
+            Permissions-Policy: camera=(), microphone=(), geolocation=()
+          EOL
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
           path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
-
-      - name: Fix paths
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
@@ -100,7 +106,6 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
-        run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
           pnpm install --frozen-lockfile
           pnpm run build
