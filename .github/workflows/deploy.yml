@@ -34,51 +34,47 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
+      - name: Install Frontend Dependencies
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
+        run: pnpm install
+
       - name: Build Frontend
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
-          pnpm install
           pnpm run build
-          # Create 404 and index files
-          cp dist/index.html dist/404.html
-          # Ensure base files are in place
           touch dist/.nojekyll
-          # Copy all public assets
           cp -r public/* dist/ 2>/dev/null || true
-          
+
+      - name: Install Admin Dependencies
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
+        run: pnpm install
+
       - name: Build Admin Dashboard
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
-          pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
-          # Create admin 404 page
-          cp ../ebook-store/dist/index.html ../ebook-store/dist/admin/404.html
-          cp ../ebook-store/dist/index.html ../ebook-store/dist/admin/index.html
 
       - name: Configure site
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          # Make 404.html a copy of index.html for SPA routing
+          # Setup SPA routing
           cp index.html 404.html
-          
-          # Make sure admin directory exists and has proper files
-          mkdir -p admin
-          cp index.html admin/404.html
           cp index.html admin/index.html
+          cp index.html admin/404.html
           
-          # Create client-side config
-          cat > config.json << 'EOL'
+          # Create client config
+          cat > config.json << 'EOLCONFIG'
           {
             "baseUrl": "/ebookzone.in",
             "apiUrl": "/api",
             "assetsPath": "./assets"
           }
-          EOL
+          EOLCONFIG
 
           # Create security headers
-          cat > _headers << 'EOL'
+          cat > _headers << 'EOLHEADERS'
           /*
             Cache-Control: public, max-age=31536000
             X-Frame-Options: DENY
@@ -86,7 +82,7 @@ jobs:
             X-XSS-Protection: 1; mode=block
             Referrer-Policy: strict-origin-when-cross-origin
             Permissions-Policy: camera=(), microphone=(), geolocation=()
-          EOL
+          EOLHEADERS
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
