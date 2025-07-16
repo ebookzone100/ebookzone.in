@@ -73,14 +73,16 @@ jobs:
           bundler-cache: true
 
       # Install Jekyll and dependencies
-      - name: Install Jekyll
+      - name: Install Jekyll and Bundler
         run: |
           gem install bundler
+          bundle config set --local path 'vendor/bundle'
           bundle install
 
       # Build Jekyll site
-      - name: Build with Jekyll
-        run: bundle exec jekyll build
+      - name: Build Jekyll site
+        run: |
+          bundle exec jekyll build --baseurl "/ebookzone.in"
         env:
           JEKYLL_ENV: production
 

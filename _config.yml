@@ -1,9 +1,10 @@
-theme: minima
+remote_theme: pages-themes/minimal@v0.2.0
 title: eBookZone
 description: Your Digital Library for Knowledge and Learning
 baseurl: "/ebookzone.in"
 url: "https://ebookzone100.github.io"
 plugins:
+  - jekyll-remote-theme
   - jekyll-seo-tag
   - jekyll-sitemap
 
