@@ -6,25 +6,28 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: Set up Node
         uses: actions/setup-node@v3
         with:
-          node-version: "18"
+          node-version: '18'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
@@ -34,20 +37,35 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      - name: Install and build frontend
+      - name: Build Frontend
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install
           pnpm run build
           cp dist/index.html dist/404.html
 
-      - name: Install and build admin
+      - name: Build Admin Dashboard
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
           pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
+
+      - name: Fix asset paths
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
+          find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
 
       - name: Fix paths
         run: |
