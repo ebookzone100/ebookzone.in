@@ -39,7 +39,10 @@ jobs:
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install
           pnpm run build
-          cp index.html dist/404.html
+          cp dist/index.html dist/404.html
+          # Ensure base files are in place
+          touch dist/.nojekyll
+          cp public/* dist/ || true
 
       - name: Build Admin Dashboard
         run: |
@@ -48,18 +51,22 @@ jobs:
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
+          # Ensure admin has 404 page
+          cp ../ebook-store/dist/404.html ../ebook-store/dist/admin/404.html
 
       - name: Configure site
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          # Fix asset paths
+          # Fix asset paths in all HTML files
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
           find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
-          # Create admin redirects
-          mkdir -p admin
-          cp index.html admin/index.html
-          cp 404.html admin/404.html
-          # Create headers file
+          find . -type f -name "*.html" -exec sed -i 's/href="\//href="\.\//g' {} +
+          find . -type f -name "*.html" -exec sed -i 's/src="\//src="\.\//g' {} +
+          
+          # Create necessary files
+          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=/"></head></html>' > 404.html
+          
+          # Create headers file for CDN and security
           cat > _headers << EOL
           /*
             Cache-Control: public, max-age=31536000
@@ -68,6 +75,12 @@ jobs:
             X-XSS-Protection: 1; mode=block
             Referrer-Policy: strict-origin-when-cross-origin
             Permissions-Policy: camera=(), microphone=(), geolocation=()
+          EOL
+          
+          # Create redirects file
+          cat > _redirects << EOL
+          /* /index.html 200
+          /admin/* /admin/index.html 200
           EOL
 
       - name: Upload artifact
