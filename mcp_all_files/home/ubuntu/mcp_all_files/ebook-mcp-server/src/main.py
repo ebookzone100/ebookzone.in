@@ -42,12 +42,37 @@ CORS(app, resources={
     r"/*": {
         "origins": ALLOWED_ORIGINS,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Range", "X-Content-Range"],
+        "supports_credentials": True,
+        "max_age": 600
     }
 })
 
 # Production configurations
 app.config['SERVER_NAME'] = os.getenv('SERVER_NAME', 'localhost:5000')
+
+# Error handling
+@app.errorhandler(404)
+def not_found_error(error):
+    return {'error': 'Resource not found'}, 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return {'error': 'Internal server error'}, 500
+
+@app.errorhandler(400)
+def bad_request_error(error):
+    return {'error': str(error)}, 400
+
+@app.errorhandler(401)
+def unauthorized_error(error):
+    return {'error': 'Unauthorized'}, 401
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    return {'error': 'Forbidden'}, 403
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 if os.getenv('FLASK_ENV') == 'production':
     app.config['SESSION_COOKIE_SECURE'] = True
