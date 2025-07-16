@@ -6,30 +6,7 @@ on:
       - main
   workflow_dispatch:
 
-concu      # Setup Ruby for Jekyll
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-
-      # Install Jekyll and dependencies
-      - name: Install Jekyll
-        run: |
-          gem install bundler
-          bundle install
-
-      # Build Jekyll site
-      - name: Build with Jekyll
-        run: bundle exec jekyll build
-        env:
-          JEKYLL_ENV: production
-
-      # Setup Pages
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-
-      # Fix paths and create redirectsy:
+concurrency:
   group: "pages"
   cancel-in-progress: false
 
@@ -87,6 +64,25 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
+
+      # Setup Ruby for Jekyll
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      # Install Jekyll and dependencies
+      - name: Install Jekyll
+        run: |
+          gem install bundler
+          bundle install
+
+      # Build Jekyll site
+      - name: Build with Jekyll
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production
 
       # Build Frontend Store
       - name: Install and build frontend
