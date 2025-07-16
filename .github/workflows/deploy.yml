@@ -1,0 +1,112 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+  PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # Build Frontend Store
+      - name: Install and build frontend
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      # Build Admin Dashboard
+      - name: Install and build admin
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
+          pnpm install --frozen-lockfile
+          pnpm run build
+          mkdir -p ../ebook-store/dist/admin
+          cp -r dist/* ../ebook-store/dist/admin/
+
+      # Setup Backend
+      - name: Install Python dependencies
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-mcp-server
+          pip install -r requirements.txt
+
+      # Create 404.html for GitHub Pages SPA routing
+      - name: Create 404.html
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          cp index.html 404.html
+
+      # Setup Pages
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      # Upload artifact
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+
+      # Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+        with:
+          token: ${{ env.PAT_TOKEN }}
+          
+      # Verify deployment
+      - name: Verify deployment
+        run: |
+          echo "Deployed to: ${{ steps.deployment.outputs.page_url }}"
+          curl -s -o /dev/null -w "%{http_code}" ${{ steps.deployment.outputs.page_url }}
