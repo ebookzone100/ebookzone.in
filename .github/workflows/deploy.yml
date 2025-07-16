@@ -10,6 +10,7 @@ permissions:
   pages: write
   id-token: write
 
+# Allow one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -25,56 +26,56 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: "18"
+          cache: 'pnpm'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
+          run_install: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      - name: Install Frontend Dependencies
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
-        run: pnpm install
-
+      # Build Frontend
       - name: Build Frontend
         working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
         run: |
+          pnpm install
           pnpm run build
           touch dist/.nojekyll
           cp -r public/* dist/ 2>/dev/null || true
 
-      - name: Install Admin Dependencies
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
-        run: pnpm install
-
+      # Build Admin Dashboard
       - name: Build Admin Dashboard
         working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
         run: |
+          pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
 
+      # Configure site for GitHub Pages
       - name: Configure site
         working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
         run: |
           # Setup SPA routing
           cp index.html 404.html
+          mkdir -p admin
           cp index.html admin/index.html
           cp index.html admin/404.html
           
-          # Create client config
-          cat > config.json << 'EOLCONFIG'
+          # Create base configuration
+          cat > config.json << 'EOLCONF'
           {
             "baseUrl": "/ebookzone.in",
             "apiUrl": "/api",
             "assetsPath": "./assets"
           }
-          EOLCONFIG
+          EOLCONF
 
-          # Create security headers
-          cat > _headers << 'EOLHEADERS'
+          # Set security headers
+          cat > _headers << 'EOLHEAD'
           /*
             Cache-Control: public, max-age=31536000
             X-Frame-Options: DENY
@@ -82,24 +83,22 @@ jobs:
             X-XSS-Protection: 1; mode=block
             Referrer-Policy: strict-origin-when-cross-origin
             Permissions-Policy: camera=(), microphone=(), geolocation=()
-          EOLHEADERS
+          EOLHEAD
 
+      # Upload built files
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
           path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
 
+  # Deploy job
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
-        id: deploy
+        id: deployment
         uses: actions/deploy-pages@v2
-
-      - name: Verify deployment
-        run: |
-          echo "Deployed to: ${{ steps.deploy.outputs.page_url }}"
