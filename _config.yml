@@ -1,0 +1,24 @@
+theme: minima
+title: eBookZone
+description: Your Digital Library for Knowledge and Learning
+baseurl: "/ebookzone.in"
+url: "https://ebookzone100.github.io"
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# Theme settings
+header_pages:
+  - about.md
+  - books.md
+  - contact.md
+
+# Site settings
+author:
+  name: eBookZone
+  email: contact@ebookzone.in
+
+# Social links
+social_links:
+  twitter: ebookzone
+  github: ebookzone100
