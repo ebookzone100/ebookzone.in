@@ -10,7 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -26,86 +25,93 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: "18"
-          cache: 'pnpm'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
-          run_install: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      # Build Frontend
       - name: Build Frontend
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
         run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install
           pnpm run build
-          touch dist/.nojekyll
-          cp -r public/* dist/ 2>/dev/null || true
-
-      # Build Admin Dashboard
-      - name: Build Admin Dashboard
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
-        run: |
-          pnpm install
-          pnpm run build
-          mkdir -p ../ebook-store/dist/admin
-          cp -r dist/* ../ebook-store/dist/admin/
-
-      # Configure site for GitHub Pages
-      - name: Configure site
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-        run: |
-          # Create root level files for SPA routing
+          
+          # Ensure proper SPA routing
+          cd dist
           cp index.html 404.html
           
-          # Create proper admin directory structure
-          mkdir -p admin
-          cp index.html admin/index.html
-          cp index.html admin/404.html
+          # Create a public directory if it doesn't exist
+          mkdir -p public
           
-          # Create base configuration with correct paths
-          cat > config.json << 'EOLCONF'
-          {
-            "baseUrl": "/ebookzone.in",
-            "apiUrl": "/api",
-            "assetsPath": "/ebookzone.in/assets"
-          }
-          EOLCONF
+          # Copy static assets
+          cp -r ../public/* . || true
           
-          # Create a router configuration for client-side routing
-          cat > router-config.js << 'EOLROUTER'
-          window.routerBase = '/ebookzone.in';
-          window.publicPath = '/ebookzone.in/';
-          EOLROUTER
+          # Ensure .nojekyll exists
+          touch .nojekyll
 
-          # Set security headers
-          cat > _headers << 'EOLHEAD'
+      - name: Build Admin Dashboard
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
+          pnpm install
+          pnpm run build
+          
+          # Create admin directory in frontend dist
+          mkdir -p ../ebook-store/dist/admin
+          cp -r dist/* ../ebook-store/dist/admin/
+          
+          # Setup admin SPA routing
+          cd ../ebook-store/dist/admin
+          cp index.html 404.html
+
+      - name: Configure site
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          
+          # Create SPA configuration
+          cat > _app-config.js << 'EOL'
+          window.APP_CONFIG = {
+            baseUrl: "/ebookzone.in",
+            basename: "/ebookzone.in",
+            assetPath: "/ebookzone.in/assets",
+            apiUrl: "/api"
+          };
+          EOL
+          
+          # Add script to index.html and 404.html
+          for file in index.html 404.html admin/index.html admin/404.html; do
+            if [ -f "$file" ]; then
+              sed -i 's/<head>/<head><script src="\/_app-config.js"><\/script>/' "$file"
+            fi
+          done
+          
+          # Create security and routing headers
+          cat > _headers << 'EOL'
           /*
             Cache-Control: public, max-age=31536000
             X-Frame-Options: DENY
             X-Content-Type-Options: nosniff
             X-XSS-Protection: 1; mode=block
             Referrer-Policy: strict-origin-when-cross-origin
-            Permissions-Policy: camera=(), microphone=(), geolocation=()
-          EOLHEAD
+          EOL
 
-      # Upload built files
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
           path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
 
-  # Deploy job
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
