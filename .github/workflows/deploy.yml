@@ -5,11 +5,13 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -20,46 +22,53 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Set up Node
+      
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: "18"
+          cache: 'pnpm'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
+          run_install: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
+      # Build Frontend
       - name: Build Frontend
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install
           pnpm run build
-          cp dist/index.html dist/404.html
+          cp index.html dist/404.html
 
+      # Build Admin Dashboard
       - name: Build Admin Dashboard
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
           pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
 
+      # Fix paths and configure site
       - name: Configure site
+        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
         run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
           # Fix asset paths
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
           find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
+
           # Create admin redirects
           mkdir -p admin
           cp index.html admin/index.html
           cp 404.html admin/404.html
-          # Create headers
+
+          # Create headers file
           cat > _headers << EOL
           /*
             Cache-Control: public, max-age=31536000
@@ -70,27 +79,7 @@ jobs:
             Permissions-Policy: camera=(), microphone=(), geolocation=()
           EOL
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
-        with:
-          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-        run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
-          find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
-
-      - name: Create headers file
-        run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          cat > _headers << EOL
-          /*
-            Cache-Control: public, max-age=31536000
-            X-Frame-Options: DENY
-            X-Content-Type-Options: nosniff
-            X-XSS-Protection: 1; mode=block
-            Referrer-Policy: strict-origin-when-cross-origin
-          EOL
-
+      # Upload the built files
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
@@ -101,77 +90,12 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
-        id: deployment
+        id: deploy
         uses: actions/deploy-pages@v2
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
-          pnpm install --frozen-lockfile
-          pnpm run build
-          mkdir -p ../ebook-store/dist/admin
-          cp -r dist/* ../ebook-store/dist/admin/
 
-      # Setup Backend
-      - name: Install Python dependencies
-        run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-mcp-server
-          pip install -r requirements.txt
-
-      # Create 404.html for GitHub Pages SPA routing
-      - name: Create 404.html
-        run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          cp index.html 404.html
-
-      # Setup Pages
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-
-      # Fix paths and create SPA redirects
-      - name: Fix paths and create redirects
-        run: |
-          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          sed -i 's/\/assets/\.\/assets/g' index.html
-          sed -i 's/\/src/\.\/src/g' index.html
-          cp index.html 404.html
-          
-          # Create admin redirect
-          mkdir -p admin
-          cp index.html admin/index.html
-          cp 404.html admin/404.html
-
-      # Upload artifact
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
-        with:
-          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-
-      # Configure headers and caching
-      - name: Configure headers
-        run: |
-          echo '/*' > mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  Cache-Control: public, max-age=31536000' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  X-Frame-Options: DENY' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  X-Content-Type-Options: nosniff' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  X-XSS-Protection: 1; mode=block' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  Referrer-Policy: strict-origin-when-cross-origin' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-          echo '  Permissions-Policy: camera=(), microphone=(), geolocation=()' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
-
-      # Deploy to GitHub Pages
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Verify deployment
       - name: Verify deployment
         run: |
-          echo "Deployed to: ${{ steps.deployment.outputs.page_url }}"
-          curl -s -o /dev/null -w "%{http_code}" ${{ steps.deployment.outputs.page_url }}
-          
-      # Purge cache if needed
-      - name: Purge CDN cache
-        run: |
-          curl -X PURGE ${{ steps.deployment.outputs.page_url }}
+          echo "Deployed to: ${{ steps.deploy.outputs.page_url }}"
