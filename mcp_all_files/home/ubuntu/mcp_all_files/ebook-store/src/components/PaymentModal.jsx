@@ -1,19 +1,49 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, CreditCard, Shield, Lock, CheckCircle, Globe } from 'lucide-react'
-import currencyService from '../services/currencyService'
-import PriceDisplay from './PriceDisplay'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Credi      if (!response.ok) {
+        throw new Error('Failed to create Razorpay order');
+      }
 
-const MCP_API_BASE_URL = 'https://w5hni7c7oloe.manus.space/api'
+      const razorpayOrder = await response.json();
 
+      const options: any = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: "eBookZone",
+        description: `Purchase: ${book.title}`,
+        image: './favicon.ico',
+        order_id: razorpayOrder.order_id, Lock, CheckCircle, Globe } from 'lucide-react';
+import currencyService from '../services/currencyService';
+import PriceDisplay from './PriceDisplay';
+import { useAuth } from '../context/AuthContext';
+
+const MCP_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+// Define types for Razorpay response
 const PaymentModal = ({ isOpen, onClose, book, onSuccess }) => {
-  const { user, token } = useAuth()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [currentCurrency, setCurrentCurrency] = useState('USD')
-  const [convertedPrice, setConvertedPrice] = useState(0)
-  const [orderId, setOrderId] = useState(null)
+  const { user, token } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [currentCurrency, setCurrentCurrency] = useState('USD');
+  const [convertedPrice, setConvertedPrice] = useState(0);
+  const [orderId, setOrderId] = useState(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  useEffect(() => {
+    loadRazorpayScript().then(setRazorpayLoaded);
+  }, []);
 
   useEffect(() => {
     const updateCurrency = async () => {
@@ -82,22 +112,75 @@ const PaymentModal = ({ isOpen, onClose, book, onSuccess }) => {
   };
 
   const initiateRazorpayPayment = async () => {
-    setIsProcessing(true);
-    const order = await createOrder();
+    try {
+      setIsProcessing(true);
+      const order = await createOrder();
 
-    if (!order) {
-      setIsProcessing(false);
-      return;
-    }
+      if (!order) {
+        setIsProcessing(false);
+        return;
+      }
 
-    const options = {
-      key: 'rzp_test_your_key_here', // Replace with your Razorpay key
-      amount: Math.round(convertedPrice * 100), // Amount in smallest currency unit
-      currency: currentCurrency,
-      name: "eBookZone",
-      description: book.title,
-      image: '/logo.png', // Your logo
-      order_id: order.razorpay_order_id, // This should come from your backend
+      // Create Razorpay order
+      const response = await fetch(`${MCP_API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ order_id: order.id })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create Razorpay order');
+      }
+
+      const razorpayOrder = await response.json();
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: "eBookZone",
+        description: book.title,
+        image: './favicon.ico',
+        order_id: razorpayOrder.order_id,
+        handler: async function (response) {
+          try {
+            const verifyResponse = await fetch(`${MCP_API_BASE_URL}/payments/razorpay/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            if (verifyResponse.ok) {
+              setPaymentSuccess(true);
+              onSuccess && onSuccess();
+            } else {
+              throw new Error('Payment verification failed');
+            }
+          } catch (error) {
+            console.error('Payment verification error:', error);
+            alert('Payment verification failed. Please contact support.');
+          } finally {
+            setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || ''
+        },
+        theme: {
+          color: '#6366f1'
+        }
+      };
       handler: async function (response) {
         // Handle successful payment
         try {

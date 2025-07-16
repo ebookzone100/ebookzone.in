@@ -6,13 +6,20 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pages: write
   id-token: write
+  deployments: write
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
 
 jobs:
   build-and-deploy:
@@ -63,7 +70,8 @@ jobs:
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install --frozen-lockfile
-          pnpm run build
+          VITE_BASE_URL=/ebookzone.in VITE_GITHUB_PAGES=true pnpm run build
+          cp dist/index.html dist/404.html
 
       # Build Admin Dashboard
       - name: Install and build admin
@@ -90,11 +98,35 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
+      # Fix paths and create SPA redirects
+      - name: Fix paths and create redirects
+        run: |
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          sed -i 's/\/assets/\.\/assets/g' index.html
+          sed -i 's/\/src/\.\/src/g' index.html
+          cp index.html 404.html
+          
+          # Create admin redirect
+          mkdir -p admin
+          cp index.html admin/index.html
+          cp 404.html admin/404.html
+
       # Upload artifact
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
           path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+
+      # Configure headers and caching
+      - name: Configure headers
+        run: |
+          echo '/*' > mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  Cache-Control: public, max-age=31536000' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  X-Frame-Options: DENY' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  X-Content-Type-Options: nosniff' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  X-XSS-Protection: 1; mode=block' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  Referrer-Policy: strict-origin-when-cross-origin' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
+          echo '  Permissions-Policy: camera=(), microphone=(), geolocation=()' >> mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist/_headers
 
       # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
@@ -108,3 +140,8 @@ jobs:
         run: |
           echo "Deployed to: ${{ steps.deployment.outputs.page_url }}"
           curl -s -o /dev/null -w "%{http_code}" ${{ steps.deployment.outputs.page_url }}
+          
+      # Purge cache if needed
+      - name: Purge CDN cache
+        run: |
+          curl -X PURGE ${{ steps.deployment.outputs.page_url }}

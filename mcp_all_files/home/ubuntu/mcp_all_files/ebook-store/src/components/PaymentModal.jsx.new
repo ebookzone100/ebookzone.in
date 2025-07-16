@@ -1,0 +1,271 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, CreditCard, Shield, Lock, CheckCircle, Globe } from 'lucide-react';
+import currencyService from '../services/currencyService';
+import PriceDisplay from './PriceDisplay';
+import { useAuth } from '../context/AuthContext';
+
+const MCP_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
+const PaymentModal = ({ isOpen, onClose, book, onSuccess }) => {
+  const { user, token } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [currentCurrency, setCurrentCurrency] = useState('USD');
+  const [convertedPrice, setConvertedPrice] = useState(0);
+  const [orderId, setOrderId] = useState(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  useEffect(() => {
+    loadRazorpayScript().then(setRazorpayLoaded);
+  }, []);
+
+  useEffect(() => {
+    const updateCurrency = async () => {
+      await currencyService.initialize();
+      const currency = currencyService.getCurrentCurrency();
+      setCurrentCurrency(currency);
+      setConvertedPrice(currencyService.convertPrice(book?.price || 0, 'USD', currency));
+    };
+
+    if (book) {
+      updateCurrency();
+    }
+
+    const handleCurrencyChange = (event) => {
+      const newCurrency = event.detail;
+      setCurrentCurrency(newCurrency);
+      setConvertedPrice(currencyService.convertPrice(book?.price || 0, 'USD', newCurrency));
+    };
+
+    window.addEventListener('currencyChanged', handleCurrencyChange);
+    return () => window.removeEventListener('currencyChanged', handleCurrencyChange);
+  }, [book]);
+
+  const createOrder = async () => {
+    if (!user || !token) {
+      alert('Please log in to make a purchase.');
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${MCP_API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          items: [{
+            book_id: book.id,
+            quantity: 1,
+            price: book.price
+          }],
+          currency: currentCurrency,
+          total_amount: convertedPrice
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || response.statusText);
+      }
+
+      const data = await response.json();
+      setOrderId(data.order.id);
+      return data.order;
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Error creating order. Please try again.');
+      return null;
+    }
+  };
+
+  const handlePaymentVerification = async (razorpayResponse) => {
+    try {
+      const verifyResponse = await fetch(`${MCP_API_BASE_URL}/payments/razorpay/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          razorpay_order_id: razorpayResponse.razorpay_order_id,
+          razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+          razorpay_signature: razorpayResponse.razorpay_signature
+        })
+      });
+
+      if (verifyResponse.ok) {
+        setPaymentSuccess(true);
+        if (onSuccess) onSuccess();
+      } else {
+        throw new Error('Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      alert('Payment verification failed. Please contact support.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const initiateRazorpayPayment = async () => {
+    try {
+      if (!razorpayLoaded) {
+        alert('Payment system is loading. Please try again in a moment.');
+        return;
+      }
+
+      setIsProcessing(true);
+      const order = await createOrder();
+
+      if (!order) {
+        setIsProcessing(false);
+        return;
+      }
+
+      const response = await fetch(`${MCP_API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ order_id: order.id })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create Razorpay order');
+      }
+
+      const razorpayOrder = await response.json();
+      const razorpay = new window.Razorpay({
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: "eBookZone",
+        description: `Purchase: ${book.title}`,
+        image: './favicon.ico',
+        order_id: razorpayOrder.order_id,
+        handler: handlePaymentVerification,
+        prefill: {
+          name: user ? user.name : '',
+          email: user ? user.email : '',
+          contact: ''
+        },
+        theme: {
+          color: '#6366f1'
+        },
+        notes: {
+          book_title: book.title,
+          original_price_usd: book.price,
+          order_id: order.id
+        }
+      });
+
+      razorpay.open();
+    } catch (error) {
+      console.error('Payment initialization error:', error);
+      alert('Failed to initialize payment. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          className="relative w-full max-w-lg bg-white rounded-lg shadow-xl p-6"
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {paymentSuccess ? (
+            <div className="text-center py-8">
+              <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Payment Successful!</h3>
+              <p className="text-gray-600 mb-6">
+                Thank you for your purchase. You can now access your book.
+              </p>
+              <button
+                onClick={onClose}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4">Complete Purchase</h2>
+              <div className="mb-6">
+                <h3 className="font-medium mb-2">{book.title}</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-gray-600">Price:</span>
+                  <PriceDisplay amount={convertedPrice} currency={currentCurrency} />
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center text-sm text-gray-600">
+                  <Lock className="w-4 h-4 mr-2" />
+                  <span>Secure payment processing</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Shield className="w-4 h-4 mr-2" />
+                  <span>Protected by bank-level security</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Globe className="w-4 h-4 mr-2" />
+                  <span>International payments accepted</span>
+                </div>
+              </div>
+
+              <button
+                onClick={initiateRazorpayPayment}
+                disabled={isProcessing}
+                className="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isProcessing ? (
+                  <span>Processing...</span>
+                ) : (
+                  <>
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    <span>Pay Now</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+export default PaymentModal;

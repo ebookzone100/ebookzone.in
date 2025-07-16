@@ -14,7 +14,7 @@ import { AuthProvider } from './context/AuthContext'
 import './App.css'
 
 function App() {
-  const basename = import.meta.env.VITE_GITHUB_PAGES === 'true' ? '/ebookzone.in' : '';
+  const basename = '/ebookzone.in';
 
   return (
     <Router basename={basename}>
