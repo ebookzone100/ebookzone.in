@@ -5,13 +5,11 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -23,51 +21,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "18"
-          cache: 'pnpm'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
-          run_install: false
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
 
-      # Build Frontend
       - name: Build Frontend
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
         run: |
+          cd ebook-store
           pnpm install
           pnpm run build
           cp index.html dist/404.html
 
-      # Build Admin Dashboard
       - name: Build Admin Dashboard
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
         run: |
+          cd ebook-admin-dashboard
           pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
           cp -r dist/* ../ebook-store/dist/admin/
 
-      # Fix paths and configure site
       - name: Configure site
-        working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
         run: |
+          cd ebook-store/dist
           # Fix asset paths
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
           find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
-
           # Create admin redirects
           mkdir -p admin
           cp index.html admin/index.html
           cp 404.html admin/404.html
-
           # Create headers file
           cat > _headers << EOL
           /*
@@ -79,18 +70,17 @@ jobs:
             Permissions-Policy: camera=(), microphone=(), geolocation=()
           EOL
 
-      # Upload the built files
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
+          path: ebook-store/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: \${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
@@ -98,4 +88,4 @@ jobs:
 
       - name: Verify deployment
         run: |
-          echo "Deployed to: ${{ steps.deploy.outputs.page_url }}"
+          echo "Deployed to: \${{ steps.deploy.outputs.page_url }}"
