@@ -59,20 +59,28 @@ jobs:
       - name: Configure site
         working-directory: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
         run: |
-          # Setup SPA routing
+          # Create root level files for SPA routing
           cp index.html 404.html
+          
+          # Create proper admin directory structure
           mkdir -p admin
           cp index.html admin/index.html
           cp index.html admin/404.html
           
-          # Create base configuration
+          # Create base configuration with correct paths
           cat > config.json << 'EOLCONF'
           {
             "baseUrl": "/ebookzone.in",
             "apiUrl": "/api",
-            "assetsPath": "./assets"
+            "assetsPath": "/ebookzone.in/assets"
           }
           EOLCONF
+          
+          # Create a router configuration for client-side routing
+          cat > router-config.js << 'EOLROUTER'
+          window.routerBase = '/ebookzone.in';
+          window.publicPath = '/ebookzone.in/';
+          EOLROUTER
 
           # Set security headers
           cat > _headers << 'EOLHEAD'

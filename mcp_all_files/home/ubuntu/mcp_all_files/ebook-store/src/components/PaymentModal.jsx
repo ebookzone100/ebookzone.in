@@ -1,19 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Credi      if (!response.ok) {
-        throw new Error('Failed to create Razorpay order');
-      }
-
-      const razorpayOrder = await response.json();
-
-      const options: any = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        name: "eBookZone",
-        description: `Purchase: ${book.title}`,
-        image: './favicon.ico',
-        order_id: razorpayOrder.order_id, Lock, CheckCircle, Globe } from 'lucide-react';
+import { X, CreditCard, Lock, CheckCircle, Globe } from 'lucide-react';
 import currencyService from '../services/currencyService';
 import PriceDisplay from './PriceDisplay';
 import { useAuth } from '../context/AuthContext';

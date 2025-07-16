@@ -14,10 +14,11 @@ import { AuthProvider } from './context/AuthContext'
 import './App.css'
 
 function App() {
-  const basename = '/ebookzone.in';
+  // Get the base URL from the environment or default to /ebookzone.in
+  const basename = import.meta.env.BASE_URL || '/ebookzone.in/';
 
   return (
-    <Router basename={basename}>
+    <Router basename={basename.replace(/\/$/, '')}>
       <AuthProvider>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
           <Navbar />
