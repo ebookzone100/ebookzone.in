@@ -60,37 +60,15 @@ jobs:
       - name: Configure site
         run: |
           cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
-          # Create root level files
-          cat > 404.html << 'EOL'
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Redirecting...</title>
-              <script>
-                const path = window.location.pathname.replace('/ebookzone.in', '');
-                const isAdmin = path.startsWith('/admin');
-                const redirectUrl = isAdmin ? '/ebookzone.in/admin' : '/ebookzone.in';
-                window.location.href = redirectUrl;
-              </script>
-              <meta http-equiv="refresh" content="0;url=/ebookzone.in">
-            </head>
-            <body>
-              Redirecting...
-            </body>
-          </html>
-          EOL
-
-          # Copy 404 to admin
-          cp 404.html admin/404.html
+          # Make 404.html a copy of index.html for SPA routing
+          cp index.html 404.html
           
-          # Create proper routing config
-          cat > _redirects << 'EOL'
-          /*    /index.html   200
-          /admin/*    /admin/index.html   200
-          EOL
+          # Make sure admin directory exists and has proper files
+          mkdir -p admin
+          cp index.html admin/404.html
+          cp index.html admin/index.html
           
-          # Create JSON config for client-side routing
+          # Create client-side config
           cat > config.json << 'EOL'
           {
             "baseUrl": "/ebookzone.in",
@@ -98,12 +76,6 @@ jobs:
             "assetsPath": "./assets"
           }
           EOL
-
-          # Fix asset paths in all HTML files
-          find . -type f -name "*.html" -exec sed -i 's|"/assets|"/ebookzone.in/assets|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|"/static|"/ebookzone.in/static|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|href="/|href="/ebookzone.in/|g' {} +
-          find . -type f -name "*.html" -exec sed -i 's|src="/|src="/ebookzone.in/|g' {} +
 
           # Create security headers
           cat > _headers << 'EOL'
@@ -134,4 +106,4 @@ jobs:
 
       - name: Verify deployment
         run: |
-          echo "Deployed to: \${{ steps.deploy.outputs.page_url }}"
+          echo "Deployed to: ${{ steps.deploy.outputs.page_url }}"
