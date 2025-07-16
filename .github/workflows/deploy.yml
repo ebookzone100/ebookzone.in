@@ -13,8 +13,6 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-  PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
 
 jobs:
   build-and-deploy:
@@ -103,7 +101,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v2
         with:
-          token: ${{ env.PAT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       # Verify deployment
       - name: Verify deployment
