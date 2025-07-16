@@ -36,14 +36,14 @@ jobs:
 
       - name: Build Frontend
         run: |
-          cd ebook-store
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store
           pnpm install
           pnpm run build
           cp index.html dist/404.html
 
       - name: Build Admin Dashboard
         run: |
-          cd ebook-admin-dashboard
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-admin-dashboard
           pnpm install
           pnpm run build
           mkdir -p ../ebook-store/dist/admin
@@ -51,7 +51,7 @@ jobs:
 
       - name: Configure site
         run: |
-          cd ebook-store/dist
+          cd mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
           # Fix asset paths
           find . -type f -name "*.html" -exec sed -i 's/\/assets/\.\/assets/g' {} +
           find . -type f -name "*.html" -exec sed -i 's/\/src/\.\/src/g' {} +
@@ -73,14 +73,14 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: ebook-store/dist
+          path: mcp_all_files/home/ubuntu/mcp_all_files/ebook-store/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: \${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
